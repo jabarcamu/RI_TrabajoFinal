@@ -16,23 +16,15 @@ import numpy as np
 # herramienta para analisis de sentimientos
 from textblob import TextBlob
 
-# Expresiones regulares
+# expresiones regulares
 import re
 
-
-# Fechas
+# fechas
 from datetime import datetime
-
 
 # dataframe 
 dfcovid = pd.read_csv('/home/arttrak/Projects/PythonProjects/Flask/covid19_tweets.csv')
-
-
-totalPositive = None
-totalNegative = None
-totalNeutral = None
-
-
+ 
 def text_preprocessing(s):
     """
     - Lowercase the sentence
@@ -58,40 +50,15 @@ def text_preprocessing(s):
     
     return s
 
-    
+totalPositive = None
+totalNegative = None
+totalNeutral = None
+
 labels = ['Positivo','Negativo','Neutral']
 values =[4120, 3600, 550]
 
 # Use `hole` to create a donut-like pie chart
 figpie = go.Figure(data=[go.Pie(labels=labels, values=values, hole=.3)])
-
-
-
-
-np.random.seed(1)
-rng = np.random.default_rng()
-N = 30
-random_x = np.linspace(0, 1, N)
-positive = 100 * rng.random((N)) + 100 # np.random.randn(N)
-negative = 100 * rng.random((N)) + 100 # np.random.randn(N) - 1
-neutral = 100 * rng.random((N)) + 100 # np.random.randn(N) - 1
-
-figrandom = go.Figure()
-
-# Add traces
-figrandom.add_trace(go.Scatter(x=random_x, y=positive,
-                    mode='lines',
-                    name='Positivo'))
-figrandom.add_trace(go.Scatter(x=random_x, y=negative,
-                    mode='lines',
-                    name='Negativo'))
-figrandom.add_trace(go.Scatter(x=random_x, y=neutral,
-                    mode='lines',
-                    name='Neutral'))
-
-
-
-
 
 app = Dash(__name__)
 
@@ -109,132 +76,77 @@ df = pd.DataFrame({
 })
 
 #dft = pd.read_csv('https://gist.githubusercontent.com/chriddyp/c78bf172206ce24f77d6363a2d754b59/raw/c353e8ef842413cae56ae3920b8fd78468aa4cb2/usa-agricultural-exports-2011.csv')
-dft = pd.read_csv('https://raw.githubusercontent.com/plotly/datasets/master/gapminderDataFiveYear.csv')
+# dft = pd.read_csv('https://raw.githubusercontent.com/plotly/datasets/master/gapminderDataFiveYear.csv')
 
-dfc = pd.read_csv('https://gist.githubusercontent.com/chriddyp/5d1ea79569ed194d432e56108a04d188/raw/a9f9e8076b837d541398e999dcbac2b2826a81f8/gdp-life-exp-2007.csv')
+# dfc = pd.read_csv('https://gist.githubusercontent.com/chriddyp/5d1ea79569ed194d432e56108a04d188/raw/a9f9e8076b837d541398e999dcbac2b2826a81f8/gdp-life-exp-2007.csv')
 
-dfcountry = pd.read_csv('https://plotly.github.io/datasets/country_indicators.csv')
+# dfcountry = pd.read_csv('https://plotly.github.io/datasets/country_indicators.csv')
 
-def generate_table(dataframe, max_rows=20):    
-    return html.Table([
-        html.Thead(
-            html.Tr([html.Th(col) for col in dataframe.columns])
+styleCard = {    
+    'flex': 1, 
+    'display': 'flex',
+    # 'background-color':'green', 
+    'align-items': 'center',
+    'justify-content': 'center',        
+    } 
+styleButton = {
+                'width': '50%',
+                'height':'50px',
+                'border-radius':'10px',                
+            }
+app.layout = html.Div([
+html.Div(children=[
+         html.H3(
+            children='Configuraciones',
+            style={
+                'textAlign': 'center',
+                'color': colors['text']
+            }
         ),
-        html.Tbody([
-            html.Tr([
-                html.Td(dataframe.iloc[i][col]) for col in dataframe.columns
-            ]) for i in range(min(len(dataframe), max_rows))
-        ])
-    ])
+        html.Label('Multi-Select Dropdown'),
+        html.Br(),
+        html.Label('Radio Items'),
+    ], style={'padding': 10, 'flex': 25, 'background-color':'red'}),
+
+    html.Div(children=[
+        html.H1(
+            children='Visual Analytics - Tweets Covid19',
+            style={
+                'textAlign': 'center',
+                'color': colors['text']
+            }
+        ),
+        html.Div(
+        children=[
+            html.Div(children=[
+                html.Button(id="output-tweets", children='', style=styleButton)
+            ],style=styleCard),
+            html.Div(children=[
+                html.Button(id="output-users",children='',style=styleButton)
+            ],style=styleCard)
+        ],
+        style={'display': 'flex', 'flex-direction': 'row'}),
+
+        dcc.Graph(
+            id='output-timeline',
+            # figure=figrandom
+        ),
+        dcc.Graph(
+            id='output-pie',
+            # figure=figpie
+        ),
+        html.Button(id='submit-button-state', n_clicks=0, children='Calcular'),
+    ], style={'padding': 10, 'flex': 75})
+], style={'display': 'flex', 'flex-direction': 'row'})
 
 
-figc = px.scatter(dfc, x="gdp per capita", y="life expectancy",
-                 size="population", color="continent", hover_name="country",
-                 log_x=True, size_max=60)
 
-
-fig = px.bar(df, x="Fruit", y="Amount", color="City", barmode="group")
-
-fig.update_layout(
-    plot_bgcolor=colors['background'],
-    paper_bgcolor=colors['background'],
-    font_color=colors['text']
-)
-
-
-dfstock = px.data.stocks()
-figstock = px.line(dfstock, x='date', y="GOOG")
-
-
-
-
-app.layout = html.Div(style={'backgroundColor': colors['background']}, children=[
-    html.H1(
-        children='Visual Analytics',
-        style={
-            'textAlign': 'center',
-            'color': colors['text']
-        }
-    ),
-
-    html.Div(children='Una aplicación web para el análisis de datos.', style={
-        'textAlign': 'center',
-        'color': colors['text']
-    }),
-
-    dcc.Graph(
-        id='example-graph-2',
-        figure=fig
-    ),
-
-    html.H4(children='US Agriculture Exports (2011)'),
-    generate_table(dft),
-    dcc.Graph(
-        id='life-exp-vs-gdp',
-        figure=figc
-    ),
-    dcc.Graph(id='graph-with-slider'),
-    dcc.Slider(
-        dft['year'].min(),
-        dft['year'].max(),
-        step=None,
-        value=dft['year'].min(),
-        marks={str(year): str(year) for year in dft['year'].unique()},
-        id='year-slider'
-    ),
-     html.Div([
-            dcc.Dropdown(
-                dfcountry['Indicator Name'].unique(),
-                'Fertility rate, total (births per woman)',
-                id='xaxis-column'
-            )
-        ], style={'width': '48%', 'display': 'inline-block'}),
-
-        html.Div([
-            dcc.Dropdown(
-                dfcountry['Indicator Name'].unique(),
-                'Life expectancy at birth, total (years)',
-                id='yaxis-column'
-            )            
-        ], style={'width': '48%', 'float': 'right', 'display': 'inline-block'}),
-        dcc.Graph(id='indicator-graphic'),
-        dcc.Slider(
-        dfcountry['Year'].min(),
-        dfcountry['Year'].max(),
-        step=None,
-        id='year--slider',
-        value=dfcountry['Year'].max(),
-        marks={str(year): str(year) for year in dfcountry['Year'].unique()},
-
-    ),
-    dcc.Graph(
-        id='stock',
-        figure=figstock
-    ),
-    dcc.Graph(
-        id='output-timeline',
-        # figure=figrandom
-    ),
-    dcc.Graph(
-        id='output-pie',
-        # figure=figpie
-    ),
-    html.I("TextBlob analisis sentimiento"),
-    html.Br(),
-    dcc.Input(id='input-1-state', type='text', value='Montréal'),    
-    html.Button(id='submit-button-state', n_clicks=0, children='Calcular'),
-    html.Div(id='output-state')
-
-
-])
-
-
-@app.callback(Output('output-state', 'children'),
-              Output('output-pie', 'figure'),
+@app.callback(Output('output-pie', 'figure'),
               Output('output-timeline', 'figure'),
-              Input('submit-button-state', 'n_clicks'),
-              State('input-1-state', 'value'))
-def update_output(n_clicks, input1):
+              Output('output-tweets', component_property='children'),
+              Output('output-users', component_property='children'),
+              Input('submit-button-state', 'n_clicks'))
+def update_output(n_clicks):
     print('Ingresando al callback')
 
     global dfcovid
@@ -242,13 +154,9 @@ def update_output(n_clicks, input1):
     global totalNegative
     global totalNeutral
     
-    blob = TextBlob(input1)
-    print(blob.sentiment)
     
     # obtener el dataset de covid19
-   
-    
-        
+           
     if n_clicks == 0:          
         print('No existe el dataframe') 
 
@@ -406,44 +314,18 @@ def update_output(n_clicks, input1):
     figpie = go.Figure(data=[go.Pie(labels=labels, values=values, hole=.3)])
 
 
+    # numero de tweets
+    tweets = str(len(dfcovid)) + ' tweets'
 
-    return  u'''
-        The Button has been pressed {} times,
-        Input 1 is "{}"        
-    '''.format(n_clicks, input1) , figpie, figtimeline
+    # numero de usuarios
+    users = str(len(dfcovid['user_name'].unique())) + ' usuarios'
 
+    print(tweets)
+    print(users)
 
-@app.callback(
-    Output('graph-with-slider', 'figure'),
-    Input('year-slider', 'value'))
-def update_figure(selected_year):
-    filtered_df = dft[dft.year == selected_year]
-
-    fig = px.scatter(filtered_df, x="gdpPercap", y="lifeExp",
-                     size="pop", color="continent", hover_name="country",
-                     log_x=True, size_max=55)
-
-    fig.update_layout(transition_duration=100)
-
-    return fig
+    return  figpie, figtimeline, tweets, users
 
 
-
-@app.callback(
-    Output('indicator-graphic', 'figure'),
-    Input('xaxis-column', 'value'),
-    Input('yaxis-column', 'value'),    
-    Input('year--slider', 'value'))
-def update_graph(xaxis_column_name, yaxis_column_name,year_value):
-    dff = dfcountry[dfcountry['Year'] == year_value]
-
-    fig = px.scatter(x=dff[dff['Indicator Name'] == xaxis_column_name]['Value'],
-                     y=dff[dff['Indicator Name'] == yaxis_column_name]['Value'],
-                     hover_name=dff[dff['Indicator Name'] == yaxis_column_name]['Country Name'])
-
-    fig.update_layout(margin={'l': 40, 'b': 40, 't': 10, 'r': 0}, hovermode='closest')
-
-    return fig
 
 
 if __name__ == '__main__':
