@@ -16,12 +16,23 @@ import numpy as np
 # herramienta para analisis de sentimientos
 from textblob import TextBlob
 
-# expresiones regulares
+# Expresiones regulares
 import re
+
+
+# Fechas
+from datetime import datetime
+
 
 # dataframe 
 dfcovid = pd.read_csv('/home/arttrak/Projects/PythonProjects/Flask/covid19_tweets.csv')
- 
+
+
+totalPositive = None
+totalNegative = None
+totalNeutral = None
+
+
 def text_preprocessing(s):
     """
     - Lowercase the sentence
@@ -200,10 +211,9 @@ app.layout = html.Div(style={'backgroundColor': colors['background']}, children=
         id='stock',
         figure=figstock
     ),
-
     dcc.Graph(
-        id='random',
-        figure=figrandom
+        id='output-timeline',
+        # figure=figrandom
     ),
     dcc.Graph(
         id='output-pie',
@@ -221,24 +231,42 @@ app.layout = html.Div(style={'backgroundColor': colors['background']}, children=
 
 @app.callback(Output('output-state', 'children'),
               Output('output-pie', 'figure'),
+              Output('output-timeline', 'figure'),
               Input('submit-button-state', 'n_clicks'),
               State('input-1-state', 'value'))
 def update_output(n_clicks, input1):
+    print('Ingresando al callback')
+
+    global dfcovid
+    global totalPositive
+    global totalNegative
+    global totalNeutral
+    
     blob = TextBlob(input1)
     print(blob.sentiment)
     
     # obtener el dataset de covid19
    
-    if len(dfcovid) != 0:          
+    
+        
+    if n_clicks == 0:          
         print('No existe el dataframe') 
+
+        # truncate los elementos del dataframe solo para pruebas
+        # dfcovid =  dfcovid.truncate(before=0, after=100)
         rows = len(dfcovid.axes[0])
+        print('rowssssssssssssss')
+        print(rows)
         polarity = []
         subjectivity = []
         sentiment = []
         textprocessing = []
         fecha = []
         for index in range(rows):
-            
+            textfecha = dfcovid.loc[index, 'date']
+            textfecha = textfecha.replace("-", "/")
+            fechaval = datetime.strptime(textfecha, '%Y/%m/%d %H:%M:%S')
+            fecha.append(fechaval)
             textproc = text_preprocessing(dfcovid.loc[index, 'text'])   
             textprocessing.append(textproc)   
             sentimental = TextBlob(textproc)
@@ -247,15 +275,114 @@ def update_output(n_clicks, input1):
             subjectivity.append(sentimental.sentiment.subjectivity)
             val = 0 if (pol >= -0.25 and pol <= 0.25) else 1 if pol > 0.25 else -1
             sentiment.append(val)
-    # adicionando nueva columna 
-    dfcovid['polarity'] = polarity
-    dfcovid['subjectivity'] = subjectivity
-    dfcovid['sentiment'] = sentiment
-    dfcovid['textprocessing'] = textprocessing
+              
+            
+            
+        # adicionando nueva columna 
+        dfcovid['polarity'] = polarity
+        dfcovid['subjectivity'] = subjectivity
+        dfcovid['sentiment'] = sentiment
+        dfcovid['textprocessing'] = textprocessing
+        dfcovid['fecha'] = fecha
+        print('date')
+        print(dfcovid.head(5)['date'])    
+        print('fecha')
+        print(dfcovid.head(5)['fecha'])                
+        dfcovid = (dfcovid.sort_values(by=['fecha']))
 
+        # dictionarios para los totales de las fechas
+        if(totalPositive is None):
+            print('None Positive')
+            totalPositive = dict()
+            print(totalPositive)
+        if(totalNegative is None):
+            print('None negative')
+            totalNegative = dict()                
+            print(totalNegative)
+        if(totalNeutral is None):
+            print('None Neutral')
+            totalNeutral = dict()
+            print(totalNeutral)
+
+        print('Iingresando a los acumnuladores')
+        for index in dfcovid.index:
+            textfecha = dfcovid.loc[index, 'fecha']
+            key = str(textfecha.year) + str(textfecha.month) + str(textfecha.day)            
+            
+            # positivo
+            if dfcovid.loc[index, 'sentiment'] == 1:
+                if not key in totalPositive:                
+                    totalPositive[key] = {'date':dfcovid.loc[index, 'fecha'],'count': 0}
+                totalPositive[key]['count'] = totalPositive.get(key).get('count') + 1  
+            # negativo
+            if dfcovid.loc[index, 'sentiment'] == -1:
+                if not key in totalNegative:                
+                    totalNegative[key] = {'date':dfcovid.loc[index, 'fecha'],'count': 0}
+                totalNegative[key]['count'] = totalNegative.get(key).get('count') + 1  
+            # neutro
+            if dfcovid.loc[index, 'sentiment'] == 0:
+                if not key in totalNeutral:                
+                    totalNeutral[key] = {'date':dfcovid.loc[index, 'fecha'],'count': 0}
+                totalNeutral[key]['count'] = totalNeutral.get(key).get('count') + 1  
+
+        print('Imprimir acumulado ..')
+        print('Positivo ..')
+        print(totalPositive)
+        print('negativo ..')
+        print(totalNegative)
+        print('Neutral ..')
+        print(totalNeutral)
     
+
+    # Grafica la linea de tiempo
+    figtimeline = go.Figure()
+
+    x_fecha_positive = []
+    y_sentiment_positive = []
+    for obj in totalPositive:        
+        val = totalPositive[obj]
+        x_fecha_positive.append(val['date'])
+        y_sentiment_positive.append(val['count'])                
     
-    print(dfcovid.head())
+    x_fecha_negative = []
+    y_sentiment_negative = []
+    for obj in totalNegative:
+        print(totalNegative[obj])
+        val = totalNegative[obj]
+        x_fecha_negative.append(val['date'])
+        y_sentiment_negative.append(val['count'])  
+
+    x_fecha_neutral = []
+    y_sentiment_neutral = []
+    for obj in totalNeutral:
+        print(totalNeutral[obj])
+        val = totalNeutral[obj]
+        x_fecha_neutral.append(val['date'])
+        y_sentiment_neutral.append(val['count'])  
+
+    print('Listas de graficas...........')
+    print(x_fecha_positive)
+    print(y_sentiment_positive)
+    print(x_fecha_negative)
+    print(y_sentiment_negative)
+    print(x_fecha_neutral)
+    print(y_sentiment_neutral)
+    # Add traces
+    figtimeline.add_trace(go.Scatter(x=x_fecha_positive, y=y_sentiment_positive,
+                        mode='lines',
+                        name='Positivo'))
+    figtimeline.add_trace(go.Scatter(x=x_fecha_negative, y=y_sentiment_negative,
+                        mode='lines',
+                        name='Negativo'))
+    figtimeline.add_trace(go.Scatter(x=x_fecha_neutral, y=y_sentiment_neutral,
+                        mode='lines',
+                        name='Neutral'))
+
+
+    print('sort date')
+    print(dfcovid.head(5)['date'])    
+    print('sort fecha')
+    print(dfcovid.head(5)['fecha'])
 
     letter = '''I really enjoy programming in Python. It is a very approachable
     language with a plethora of valuable, high quality, libraries in
@@ -283,7 +410,7 @@ def update_output(n_clicks, input1):
     return  u'''
         The Button has been pressed {} times,
         Input 1 is "{}"        
-    '''.format(n_clicks, input1) , figpie
+    '''.format(n_clicks, input1) , figpie, figtimeline
 
 
 @app.callback(
