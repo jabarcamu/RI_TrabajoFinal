@@ -63,8 +63,9 @@ figpie = go.Figure(data=[go.Pie(labels=labels, values=values, hole=.3)])
 app = Dash(__name__)
 
 colors = {
-    'background': '#987654',
-    'text': '#7FDBFF'
+    'backDashboard': '#B7CADB',
+    'text': '#251D3A',
+    'backConfig': '#E8E9ED',
 }
 
 # assume you have a "long-form" data frame
@@ -87,12 +88,14 @@ styleCard = {
     'display': 'flex',
     # 'background-color':'green', 
     'align-items': 'center',
-    'justify-content': 'center',        
+    'justify-content': 'center',
+    'padding': '15px'  
     } 
 styleButton = {
                 'width': '50%',
-                'height':'50px',
-                'border-radius':'10px',                
+                'height':'50px',  
+                'border-radius':'10px',  
+                              
             }
 app.layout = html.Div([
 html.Div(children=[
@@ -103,10 +106,22 @@ html.Div(children=[
                 'color': colors['text']
             }
         ),
-        html.Label('Multi-Select Dropdown'),
+        
+        
         html.Br(),
-        html.Label('Radio Items'),
-    ], style={'padding': 10, 'flex': 25, 'background-color':'red'}),
+        html.Label('Inicio - fin de fechas'),
+        dcc.DatePickerRange(
+            id='my-date-picker-range',
+            min_date_allowed=datetime(1995, 8, 5),
+            max_date_allowed=datetime(2017, 9, 19),
+            initial_visible_month=datetime(2017, 8, 5),
+            start_date=datetime(2017, 6, 21),
+            end_date=datetime(2017, 8, 25)
+        ),
+        
+ 
+
+    ], style={'padding': 10, 'flex': 25, 'background-color':colors['backConfig']}),
 
     html.Div(children=[
         html.H1(
@@ -135,8 +150,9 @@ html.Div(children=[
             id='output-pie',
             # figure=figpie
         ),
+ 
         html.Button(id='submit-button-state', n_clicks=0, children='Calcular'),
-    ], style={'padding': 10, 'flex': 75})
+    ], style={'padding': 10, 'flex': 75, 'background':colors['backDashboard']})
 ], style={'display': 'flex', 'flex-direction': 'row'})
 
 
