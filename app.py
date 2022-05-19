@@ -1,348 +1,636 @@
-# Run this app with `python app.py` and
-# visit http://127.0.0.1:8050/ in your web browser.
-
-
-from dash import Dash, dcc, html
+# -*- coding: utf-8 -*-
+"""
+Module doc string
+"""
+import pathlib
+import re
+import json
+from datetime import datetime
+import flask
+import dash
+from dash import dash_table
+import matplotlib.colors as mcolors
+import dash_bootstrap_components as dbc
+from dash import dcc
+from dash import html
+import plotly.graph_objs as go
 import plotly.express as px
 import pandas as pd
-
-from dash.dependencies import Input, Output, State
-
-import plotly.graph_objects as go
-
-# Create random data with numpy
 import numpy as np
+from precomputing_bp import add_stopwords
+from dash.dependencies import Output, Input, State
+from dateutil import relativedelta
+from wordcloud import WordCloud, STOPWORDS
+from sklearn.manifold import TSNE
 
-# herramienta para analisis de sentimientos
-from textblob import TextBlob
 
-# expresiones regulares
-import re
+DATA_PATH = pathlib.Path(__file__).parent.resolve()
+EXTERNAL_STYLESHEETS = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
+FILENAME = "data/NewsRealCOVID-19_tweets_ids_hy.tsv"
+FILENAME_PRECOMPUTED = "data/precomputed.json"
+PLOTLY_LOGO = "https://images.plot.ly/logo/new-branding/plotly-logomark.png"
+GLOBAL_DF = pd.read_csv(DATA_PATH.joinpath(FILENAME),sep="\t")
 
-# fechas
-from datetime import datetime
+with open(DATA_PATH.joinpath(FILENAME_PRECOMPUTED)) as precomputed_file:
+    PRECOMPUTED_LDA = json.load(precomputed_file)
 
-# dataframe 
-dfcovid = pd.read_csv('/home/arttrak/Projects/PythonProjects/Flask/covid19_tweets.csv')
- 
-def text_preprocessing(s):
+# sample data: sampling the entire dataset of tweets
+# in order to accelerate the plotting
+# input: dataframe or dataset and float_percent (percentage of sampling)
+def sample_data(dataframe, float_percent):
     """
-    - Lowercase the sentence
-    - Change "'t" to "not"
-    - Remove "@name"
-    - Isolate and remove punctuations except "?"
-    - Remove other special characters
-    - Remove stop words except "not" and "can"
-    - Remove trailing whitespace
+    Returns a subset of the provided dataframe.
+    The sampling is evenly distributed and reproducible
     """
-    s = s.lower()
-    # Change 't to 'not'
-    s = re.sub(r"\'t", " not", s)
-    # Remove @name
-    s = re.sub(r'(@.*?)[\s]', ' ', s)
-    # Isolate and remove punctuations except '?'
-    s = re.sub(r'([\'\"\.\(\)\!\?\\\/\,])', r' \1 ', s)
-    s = re.sub(r'[^\w\s\?]', ' ', s)
-    # Remove some special characters
-    s = re.sub(r'([\;\:\|•«\n])', ' ', s)
-    # Remove trailing whitespace
-    s = re.sub(r'\s+', ' ', s).strip()
-    
-    return s
+    print("making a local_df data sample with float_percent: %s" % (float_percent))
+    return dataframe.sample(frac=float_percent, random_state=1)
 
-totalPositive = None
-totalNegative = None
-totalNeutral = None
 
-labels = ['Positivo','Negativo','Neutral']
-values =[4120, 3600, 550]
 
-# Use `hole` to create a donut-like pie chart
-figpie = go.Figure(data=[go.Pie(labels=labels, values=values, hole=.3)])
+# helper function in order to work with sample data from covid tweets
+# input: time_values or time interval with initial date and final date
+# output Corpus reduced by time and number of registers
 
-app = Dash(__name__)
+def make_local_df(selected_year, time_values, n_selection):
+    n_float = float(n_selection / 100)
+    print("got time window:", str(time_values))
+    print("got n_selection:", str(n_selection), str(n_float))
+    # sample the dataset according to the slider
+    local_df = sample_data(GLOBAL_DF, n_float)
+    if time_values is not None:
+        time_values = time_slider_to_date(time_values)
+        local_df = local_df[
+            (local_df["created_at"] >= time_values[0])
+            & (local_df["created_at"] <= time_values[1])
+        ]
+    if selected_year:
+        local_df = local_df[local_df["year"] == selected_year]
+    print(local_df.head())
+    return local_df
 
-colors = {
-    'backDashboard': '#B7CADB',
-    'text': '#251D3A',
-    'backConfig': '#E8E9ED',
-}
 
-# assume you have a "long-form" data frame
-# see https://plotly.com/python/px-arguments/ for more options
-df = pd.DataFrame({
-    "Fruit": ["Apples", "Oranges", "Bananas", "Apples", "Oranges", "Bananas"],
-    "Amount": [4, 1, 2, 2, 4, 5],
-    "City": ["SF", "SF", "SF", "Montreal", "Montreal", "Montreal"]
-})
+def make_marks_time_slider(mini, maxi):
+    """
+    A helper function to generate a dictionary that should look something like:
+    {1420066800: '2015', 1427839200: 'Q2', 1435701600: 'Q3', 1443650400: 'Q4',
+    1451602800: '2016', 1459461600: 'Q2', 1467324000: 'Q3', 1475272800: 'Q4',
+     1483225200: '2017', 1490997600: 'Q2', 1498860000: 'Q3', 1506808800: 'Q4'}
+    """
+    step = relativedelta.relativedelta(months=+1)
+    print("Step: ",step)
+    start = datetime(year=mini.year, month=1, day=1)
+    print("Start: ",start)
+    end = datetime(year=maxi.year, month=maxi.month, day=30)
+    print("End: ",end)
+    ret = {}
 
-#dft = pd.read_csv('https://gist.githubusercontent.com/chriddyp/c78bf172206ce24f77d6363a2d754b59/raw/c353e8ef842413cae56ae3920b8fd78468aa4cb2/usa-agricultural-exports-2011.csv')
-# dft = pd.read_csv('https://raw.githubusercontent.com/plotly/datasets/master/gapminderDataFiveYear.csv')
-
-# dfc = pd.read_csv('https://gist.githubusercontent.com/chriddyp/5d1ea79569ed194d432e56108a04d188/raw/a9f9e8076b837d541398e999dcbac2b2826a81f8/gdp-life-exp-2007.csv')
-
-# dfcountry = pd.read_csv('https://plotly.github.io/datasets/country_indicators.csv')
-
-styleCard = {    
-    'flex': 1, 
-    'display': 'flex',
-    # 'background-color':'green', 
-    'align-items': 'center',
-    'justify-content': 'center',
-    'padding': '15px'  
-    } 
-styleButton = {
-                'width': '50%',
-                'height':'50px',  
-                'border-radius':'10px',  
-                              
+    current = start
+    while current <= end:
+        current_str = int(current.timestamp())
+        if current.month == 1:
+            ret[current_str] = {
+                "label": str(current.year),
+                "style": {"font-weight": "bold"},
             }
-app.layout = html.Div([
-html.Div(children=[
-         html.H3(
-            children='Configuraciones',
-            style={
-                'textAlign': 'center',
-                'color': colors['text']
+        elif current.month == 4:
+            ret[current_str] = {
+                "label": "Q2",
+                "style": {"font-weight": "lighter", "font-size": 7},
             }
-        ),
-        
-        
-        html.Br(),
-        html.Label('Inicio - fin de fechas'),
-        dcc.DatePickerRange(
-            id='my-date-picker-range',
-            min_date_allowed=datetime(1995, 8, 5),
-            max_date_allowed=datetime(2017, 9, 19),
-            initial_visible_month=datetime(2017, 8, 5),
-            start_date=datetime(2017, 6, 21),
-            end_date=datetime(2017, 8, 25)
-        ),
-        
- 
-
-    ], style={'padding': 10, 'flex': 25, 'background-color':colors['backConfig']}),
-
-    html.Div(children=[
-        html.H1(
-            children='Visual Analytics - Tweets Covid19',
-            style={
-                'textAlign': 'center',
-                'color': colors['text']
+        elif current.month == 7:
+            ret[current_str] = {
+                "label": "Q3",
+                "style": {"font-weight": "lighter", "font-size": 7},
             }
-        ),
-        html.Div(
-        children=[
-            html.Div(children=[
-                html.Button(id="output-tweets", children='', style=styleButton)
-            ],style=styleCard),
-            html.Div(children=[
-                html.Button(id="output-users",children='',style=styleButton)
-            ],style=styleCard)
+        elif current.month == 10:
+            ret[current_str] = {
+                "label": "Q4",
+                "style": {"font-weight": "lighter", "font-size": 7},
+            }
+        else:
+            pass
+        current += step
+    print("Ret: ",ret)
+    return ret
+
+
+def time_slider_to_date(time_values):
+    """ TODO """
+    min_date = datetime.fromtimestamp(time_values[0]).strftime("%c")
+    max_date = datetime.fromtimestamp(time_values[1]).strftime("%c")
+    print("Converted time_values: ")
+    print("\tmin_date:", time_values[0], "to: ", min_date)
+    print("\tmax_date:", time_values[1], "to: ", max_date)
+    return [min_date, max_date]
+
+
+
+
+# plotly_wordcloud: it work with wordcloud and get its properties
+# such as, frequency, positions, words, and others {fontsize,orientation and color}
+# then plot a bar frequency with every word
+# and finally a treemap with the respective size of cells 
+def plotly_wordcloud(data_frame):
+    """A wonderful function that returns figure data for three equally
+    wonderful plots: wordcloud, frequency histogram and treemap"""
+    tweets_text = list(data_frame["text"].dropna().values)
+
+    if len(tweets_text) < 1:
+        return {}, {}, {}
+
+    # join all documents in corpus
+    text = " ".join(list(tweets_text))
+
+    word_cloud = WordCloud(stopwords=set(STOPWORDS), max_words=100, max_font_size=90)
+    word_cloud.generate(text)
+
+    word_list = []
+    freq_list = []
+    fontsize_list = []
+    position_list = []
+    orientation_list = []
+    color_list = []
+
+    for (word, freq), fontsize, position, orientation, color in word_cloud.layout_:
+        word_list.append(word)
+        freq_list.append(freq)
+        fontsize_list.append(fontsize)
+        position_list.append(position)
+        orientation_list.append(orientation)
+        color_list.append(color)
+
+    # get the positions
+    x_arr = []
+    y_arr = []
+    for i in position_list:
+        x_arr.append(i[0])
+        y_arr.append(i[1])
+
+    # get the relative occurence frequencies
+    new_freq_list = []
+    for i in freq_list:
+        new_freq_list.append(i * 80)
+
+    trace = go.Scatter(
+        x=x_arr,
+        y=y_arr,
+        textfont=dict(size=new_freq_list, color=color_list),
+        hoverinfo="text",
+        textposition="top center",
+        hovertext=["{0} - {1}".format(w, f) for w, f in zip(word_list, freq_list)],
+        mode="text",
+        text=word_list,
+    )
+
+    layout = go.Layout(
+        {
+            "xaxis": {
+                "showgrid": False,
+                "showticklabels": False,
+                "zeroline": False,
+                "automargin": True,
+                "range": [-100, 250],
+            },
+            "yaxis": {
+                "showgrid": False,
+                "showticklabels": False,
+                "zeroline": False,
+                "automargin": True,
+                "range": [-100, 450],
+            },
+            "margin": dict(t=20, b=20, l=10, r=10, pad=4),
+            "hovermode": "closest",
+        }
+    )
+
+    wordcloud_figure_data = {"data": [trace], "layout": layout}
+    word_list_top = word_list[:25]
+    word_list_top.reverse()
+    freq_list_top = freq_list[:25]
+    freq_list_top.reverse()
+
+    frequency_figure_data = {
+        "data": [
+            {
+                "y": word_list_top,
+                "x": freq_list_top,
+                "type": "bar",
+                "name": "",
+                "orientation": "h",
+            }
         ],
-        style={'display': 'flex', 'flex-direction': 'row'}),
+        "layout": {"height": "550", "margin": dict(t=20, b=20, l=100, r=20, pad=4)},
+    }
+    treemap_trace = go.Treemap(
+        labels=word_list_top, parents=[""] * len(word_list_top), values=freq_list_top
+    )
+    treemap_layout = go.Layout({"margin": dict(t=10, b=10, l=5, r=5, pad=4)})
+    treemap_figure = {"data": [treemap_trace], "layout": treemap_layout}
+    return wordcloud_figure_data, frequency_figure_data, treemap_figure
 
-        dcc.Graph(
-            id='output-timeline',
-            # figure=figrandom
+
+
+def get_tweet_count_by_date(dataframe):
+    """ Helper function to get tweet counts for unique dates """
+    tweets_counts = dataframe["year"].value_counts()
+    # we filter out all tweets with less than 11 tweet for now
+    tweets_counts = tweets_counts[tweets_counts > 10]
+    values = tweets_counts.keys().tolist()
+    counts = tweets_counts.tolist()
+    return values, counts
+
+
+def populate_lda_scatter(tsne_df, df_top3words, df_dominant_topic):
+    """Calculates LDA and returns figure data you can jam into a dcc.Graph()"""
+    mycolors = np.array([color for name, color in mcolors.TABLEAU_COLORS.items()])
+
+    # for each topic we create a separate trace
+    traces = []
+    for topic_id in df_top3words["topic_id"]:
+        tsne_df_f = tsne_df[tsne_df.topic_num == topic_id]
+        cluster_name = ", ".join(
+            df_top3words[df_top3words["topic_id"] == topic_id]["words"].to_list()
+        )
+        trace = go.Scatter(
+            name=cluster_name,
+            x=tsne_df_f["tsne_x"],
+            y=tsne_df_f["tsne_y"],
+            mode="markers",
+            hovertext=tsne_df_f["doc_num"],
+            marker=dict(
+                size=6,
+                color=mycolors[tsne_df_f["topic_num"]],  # set color equal to a variable
+                colorscale="Viridis",
+                showscale=False,
+            ),
+        )
+        traces.append(trace)
+
+    layout = go.Layout({"title": "Análisis de Tópicos usando LDA"})
+
+    return {"data": traces, "layout": layout}
+
+
+"""
+#  Page layout and contents
+
+In an effort to clean up the code a bit, we decided to break it apart into
+sections. For instance: LEFT_COLUMN is the input controls you see in that gray
+box on the top left. The body variable is the overall structure which most other
+sections go into. This just makes it ever so slightly easier to find the right
+spot to add to or change without having to count too many brackets.
+"""
+
+NAVBAR = dbc.Navbar(
+    children=[
+        html.A(
+            # Use row and col to control vertical alignment of logo / brand
+            dbc.Row(
+                [
+                    dbc.Col(html.Img(src=PLOTLY_LOGO, height="30px")),
+                    dbc.Col(
+                        dbc.NavbarBrand("Analisis de Datos - RealFakesCOVID-19", className="ml-2")
+                    ),
+                ],
+                align="center",
+                no_gutters=True,
+            ),
+            href="https://plot.ly",
+        )
+    ],
+    color="dark",
+    dark=True,
+    sticky="top",
+)
+
+LEFT_COLUMN = dbc.Jumbotron(
+    [
+        html.H4(children="Seleccciona un tamanio de dataset & filtro de tiempo", className="display-5"),
+        html.Hr(className="my-2"),
+        html.Label("Selecciona un Porcentaje del Dataset", className="lead"),
+        html.P(
+            "(Bajo valor, el render será rapido. Alto valor, visualización mas precisa)",
+            style={"fontSize": 10, "font-weight": "lighter"},
         ),
-        dcc.Graph(
-            id='output-pie',
-            # figure=figpie
+        dcc.Slider(
+            id="n-selection-slider",
+            min=1,
+            max=100,
+            step=1,
+            marks={
+                0: "0%",
+                10: "",
+                20: "20%",
+                30: "",
+                40: "40%",
+                50: "",
+                60: "60%",
+                70: "",
+                80: "80%",
+                90: "",
+                100: "100%",
+            },
+            value=20,
         ),
- 
-        html.Button(id='submit-button-state', n_clicks=0, children='Calcular'),
-    ], style={'padding': 10, 'flex': 75, 'background':colors['backDashboard']})
-], style={'display': 'flex', 'flex-direction': 'row'})
+        html.Label("Selecciona filtro de tiempo", style={"marginTop": 50}, className="lead"),
+        html.P(
+            "(Puedes usar el menu o clic sobre el barchart de la derecha)",
+            style={"fontSize": 10, "font-weight": "lighter"},
+        ),
+        dcc.Dropdown(
+            ["2019","2020"],"2019",id="time-drop", clearable=False, style={"marginBottom": 50, "font-size": 12}
+        ),
+        html.Label("Seleccione Intervalo de Tiempo", className="lead"),
+        html.Div(dcc.RangeSlider(id="time-window-slider"), style={"marginBottom": 50}),
+        html.P(
+            "(Puedes definir el intervalo para aplicar wordcloud and lda)",
+            style={"fontSize": 10, "font-weight": "lighter"},
+        ),
+    ]
+)
 
 
+WORDCLOUD_PLOTS = [
+    dbc.CardHeader(html.H5("Most frequently used words in complaints")),
+    dbc.Alert(
+        "Not enough data to render these plots, please adjust the filters",
+        id="no-data-alert",
+        color="warning",
+        style={"display": "none"},
+    ),
+    dbc.CardBody(
+        [
+            dbc.Row(
+                [
+                    dbc.Col(
+                        dcc.Loading(
+                            id="loading-frequencies",
+                            children=[dcc.Graph(id="frequency_figure")],
+                            type="default",
+                        )
+                    ),
+                    dbc.Col(
+                        [
+                            dcc.Tabs(
+                                id="tabs",
+                                children=[
+                                    dcc.Tab(
+                                        label="Treemap",
+                                        children=[
+                                            dcc.Loading(
+                                                id="loading-treemap",
+                                                children=[dcc.Graph(id="covid-treemap")],
+                                                type="default",
+                                            )
+                                        ],
+                                    ),
+                                    dcc.Tab(
+                                        label="Wordcloud",
+                                        children=[
+                                            dcc.Loading(
+                                                id="loading-wordcloud",
+                                                children=[
+                                                    dcc.Graph(id="covid-wordcloud")
+                                                ],
+                                                type="default",
+                                            )
+                                        ],
+                                    ),
+                                ],
+                            )
+                        ],
+                        md=8,
+                    ),
+                ]
+            )
+        ]
+    ),
+]
 
-@app.callback(Output('output-pie', 'figure'),
-              Output('output-timeline', 'figure'),
-              Output('output-tweets', component_property='children'),
-              Output('output-users', component_property='children'),
-              Input('submit-button-state', 'n_clicks'))
-def update_output(n_clicks):
-    print('Ingresando al callback')
+LDA_PLOT = dcc.Loading(
+    id="loading-lda-plot", children=[dcc.Graph(id="tsne-lda")], type="default"
+)
+LDA_TABLE = html.Div(
+    id="lda-table-block",
+    children=[
+        dcc.Loading(
+            id="loading-lda-table",
+            children=[
+                dash_table.DataTable(
+                    id="lda-table",
+                    style_cell_conditional=[
+                        {
+                            "if": {"column_id": "Text"},
+                            "textAlign": "left",
+                            "whiteSpace": "normal",
+                            "height": "auto",
+                            "min-width": "50%",
+                        }
+                    ],
+                    style_data_conditional=[
+                        {
+                            "if": {"row_index": "odd"},
+                            "backgroundColor": "rgb(243, 246, 251)",
+                        }
+                    ],
+                    style_cell={
+                        "padding": "16px",
+                        "whiteSpace": "normal",
+                        "height": "auto",
+                        "max-width": "0",
+                    },
+                    style_header={"backgroundColor": "white", "fontWeight": "bold"},
+                    style_data={"whiteSpace": "normal", "height": "auto"},
+                    filter_action="native",
+                    page_action="native",
+                    page_current=0,
+                    page_size=5,
+                    columns=[],
+                    data=[],
+                )
+            ],
+            type="default",
+        )
+    ],
+    style={"display": "none"},
+)
 
-    global dfcovid
-    global totalPositive
-    global totalNegative
-    global totalNeutral
+LDA_PLOTS = [
+    dbc.CardHeader(html.H5("Modelamiento de Topicos LDA para RealFakeCovidTweets")),
+    dbc.Alert(
+        "Not enough data to render LDA plots, please adjust the filters",
+        id="no-data-alert-lda",
+        color="warning",
+        style={"display": "none"},
+    ),
+    dbc.CardBody(
+        [
+            html.P(
+                "Clic sobre un punto en el scatter para explorar un especifico realfake-covidtweet",
+                className="mb-0",
+            ),
+            html.P(
+                "(selecciona un anio para aplicar el analisis de topicos)",
+                style={"fontSize": 10, "font-weight": "lighter"},
+            ),
+            LDA_PLOT,
+            html.Hr(),
+            LDA_TABLE,
+        ]
+    ),
+]
+
+BODY = dbc.Container(
+    [  
+        dbc.Row(
+            [
+                dbc.Col(LEFT_COLUMN, md=4, align="center"),
+                dbc.Col([
+                    dbc.Row(
+                        dbc.Col(dbc.Card(WORDCLOUD_PLOTS)),
+                    ),
+                    dbc.Row(
+                        dbc.Col(dbc.Card(LDA_PLOTS)),
+                    )] ,md=8,
+                ),
+            ],
+            style={"marginTop": 30},
+        ),
+        #dbc.Row([dbc.Col([dbc.Card(LDA_PLOTS)])], style={"marginTop": 50}),
+
+    ],
+    className="mt-12",
+)
+
+
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+server = app.server  # for Heroku deployment
+
+app.layout = html.Div(children=[NAVBAR, BODY])
+
+
+# -- -- -- -- -- -- -- -- CALLBACKS -- -- -- -- -- -- -- -- --
+
+
+# Callback para poblar el time slider, capturando del minimo y maxima
+# fecha del dataset de tweets.
+@app.callback(
+    [
+        Output("time-window-slider", "marks"),
+        Output("time-window-slider", "min"),
+        Output("time-window-slider", "max"),
+        Output("time-window-slider", "step"),
+        Output("time-window-slider", "value"),
+    ],
+    [Input("n-selection-slider", "value")],
+)
+def populate_time_slider(value):
+    """
+    Depending on our dataset, we need to populate the time-slider
+    with different ranges. This function does that and returns the
+    needed data to the time-window-slider.
+    """
+    value += 0
+    GLOBAL_DF["created_at"] = GLOBAL_DF["created_at"].astype("datetime64[ns]")
+    GLOBAL_DF["year"] = GLOBAL_DF["created_at"].dt.to_period('Y')
+    months_names = GLOBAL_DF["year"].value_counts()
+    print("Min: ",GLOBAL_DF["created_at"].min())
+    print("Max: ",GLOBAL_DF["created_at"].max())
+
+    min_date = GLOBAL_DF["created_at"].min()
+    max_date = GLOBAL_DF["created_at"].max()
+
+    marks = make_marks_time_slider(min_date, max_date)
+    min_epoch = list(marks.keys())[0]
+    max_epoch = list(marks.keys())[-1]
     
-    
-    # obtener el dataset de covid19
-           
-    if n_clicks == 0:          
-        print('No existe el dataframe') 
-
-        # truncate los elementos del dataframe solo para pruebas
-        # dfcovid =  dfcovid.truncate(before=0, after=100)
-        rows = len(dfcovid.axes[0])
-        print('rowssssssssssssss')
-        print(rows)
-        polarity = []
-        subjectivity = []
-        sentiment = []
-        textprocessing = []
-        fecha = []
-        for index in range(rows):
-            textfecha = dfcovid.loc[index, 'date']
-            textfecha = textfecha.replace("-", "/")
-            fechaval = datetime.strptime(textfecha, '%Y/%m/%d %H:%M:%S')
-            fecha.append(fechaval)
-            textproc = text_preprocessing(dfcovid.loc[index, 'text'])   
-            textprocessing.append(textproc)   
-            sentimental = TextBlob(textproc)
-            pol = sentimental.sentiment.polarity
-            polarity.append(pol) 
-            subjectivity.append(sentimental.sentiment.subjectivity)
-            val = 0 if (pol >= -0.25 and pol <= 0.25) else 1 if pol > 0.25 else -1
-            sentiment.append(val)
-              
-            
-            
-        # adicionando nueva columna 
-        dfcovid['polarity'] = polarity
-        dfcovid['subjectivity'] = subjectivity
-        dfcovid['sentiment'] = sentiment
-        dfcovid['textprocessing'] = textprocessing
-        dfcovid['fecha'] = fecha
-        print('date')
-        print(dfcovid.head(5)['date'])    
-        print('fecha')
-        print(dfcovid.head(5)['fecha'])                
-        dfcovid = (dfcovid.sort_values(by=['fecha']))
-
-        # dictionarios para los totales de las fechas
-        if(totalPositive is None):
-            print('None Positive')
-            totalPositive = dict()
-            print(totalPositive)
-        if(totalNegative is None):
-            print('None negative')
-            totalNegative = dict()                
-            print(totalNegative)
-        if(totalNeutral is None):
-            print('None Neutral')
-            totalNeutral = dict()
-            print(totalNeutral)
-
-        print('Iingresando a los acumnuladores')
-        for index in dfcovid.index:
-            textfecha = dfcovid.loc[index, 'fecha']
-            key = str(textfecha.year) + str(textfecha.month) + str(textfecha.day)            
-            
-            # positivo
-            if dfcovid.loc[index, 'sentiment'] == 1:
-                if not key in totalPositive:                
-                    totalPositive[key] = {'date':dfcovid.loc[index, 'fecha'],'count': 0}
-                totalPositive[key]['count'] = totalPositive.get(key).get('count') + 1  
-            # negativo
-            if dfcovid.loc[index, 'sentiment'] == -1:
-                if not key in totalNegative:                
-                    totalNegative[key] = {'date':dfcovid.loc[index, 'fecha'],'count': 0}
-                totalNegative[key]['count'] = totalNegative.get(key).get('count') + 1  
-            # neutro
-            if dfcovid.loc[index, 'sentiment'] == 0:
-                if not key in totalNeutral:                
-                    totalNeutral[key] = {'date':dfcovid.loc[index, 'fecha'],'count': 0}
-                totalNeutral[key]['count'] = totalNeutral.get(key).get('count') + 1  
-
-        print('Imprimir acumulado ..')
-        print('Positivo ..')
-        print(totalPositive)
-        print('negativo ..')
-        print(totalNegative)
-        print('Neutral ..')
-        print(totalNeutral)
-    
-
-    # Grafica la linea de tiempo
-    figtimeline = go.Figure()
-
-    x_fecha_positive = []
-    y_sentiment_positive = []
-    for obj in totalPositive:        
-        val = totalPositive[obj]
-        x_fecha_positive.append(val['date'])
-        y_sentiment_positive.append(val['count'])                
-    
-    x_fecha_negative = []
-    y_sentiment_negative = []
-    for obj in totalNegative:
-        print(totalNegative[obj])
-        val = totalNegative[obj]
-        x_fecha_negative.append(val['date'])
-        y_sentiment_negative.append(val['count'])  
-
-    x_fecha_neutral = []
-    y_sentiment_neutral = []
-    for obj in totalNeutral:
-        print(totalNeutral[obj])
-        val = totalNeutral[obj]
-        x_fecha_neutral.append(val['date'])
-        y_sentiment_neutral.append(val['count'])  
-
-    print('Listas de graficas...........')
-    print(x_fecha_positive)
-    print(y_sentiment_positive)
-    print(x_fecha_negative)
-    print(y_sentiment_negative)
-    print(x_fecha_neutral)
-    print(y_sentiment_neutral)
-    # Add traces
-    figtimeline.add_trace(go.Scatter(x=x_fecha_positive, y=y_sentiment_positive,
-                        mode='lines',
-                        name='Positivo'))
-    figtimeline.add_trace(go.Scatter(x=x_fecha_negative, y=y_sentiment_negative,
-                        mode='lines',
-                        name='Negativo'))
-    figtimeline.add_trace(go.Scatter(x=x_fecha_neutral, y=y_sentiment_neutral,
-                        mode='lines',
-                        name='Neutral'))
+    print("marks: ",marks)
+    print("marks_epochs: ",min_epoch,max_epoch)
+    return (
+        marks,
+        min_epoch,
+        max_epoch,
+        (max_epoch - min_epoch) / (len(list(marks.keys())) * 3),
+        [min_epoch, max_epoch],
+    )
 
 
-    print('sort date')
-    print(dfcovid.head(5)['date'])    
-    print('sort fecha')
-    print(dfcovid.head(5)['fecha'])
-
-    letter = '''I really enjoy programming in Python. It is a very approachable
-    language with a plethora of valuable, high quality, libraries in
-    both the standard library and as third party package from the
-    community'''
-
-
-    # calculando la suma de los sentimientos
-    labels = ['Positivo','Negativo','Neutral']
-    values =[0, 0, 0]
-    for sentiment in dfcovid['sentiment']:
-        if sentiment == 1 :
-            values[0] += 1
-        if sentiment ==  -1:
-            values[1] += 1
-        if sentiment == 0 :
-            values[2] += 1
-
-
-    # Use `hole` to create a donut-like pie chart
-    figpie = go.Figure(data=[go.Pie(labels=labels, values=values, hole=.3)])
-
-
-    # numero de tweets
-    tweets = str(len(dfcovid)) + ' tweets'
-
-    # numero de usuarios
-    users = str(len(dfcovid['user_name'].unique())) + ' usuarios'
-
-    print(tweets)
-    print(users)
-
-    return  figpie, figtimeline, tweets, users
+# Callback de actualizacion de los plots de frecuencia, wordcloud, treemap
+# input: filtro de tiempo, slider de tiempo, tamanio de dataset
+@app.callback(
+    [
+        Output("covid-wordcloud", "figure"),
+        Output("frequency_figure", "figure"),
+        Output("covid-treemap", "figure"),
+        Output("no-data-alert", "style"),
+    ],
+    [
+        Input("time-drop","value"),
+        Input("time-window-slider", "value"),
+        Input("n-selection-slider", "value"),
+    ],
+)
+def update_wordcloud_plot(year_drop,time_values, n_selection):
+    """ Callback to rerender wordcloud plot """
+    local_df = make_local_df(year_drop,time_values, n_selection)
+    wordcloud, frequency_figure, treemap = plotly_wordcloud(local_df)
+    alert_style = {"display": "none"}
+    if (wordcloud == {}) or (frequency_figure == {}) or (treemap == {}):
+        alert_style = {"display": "block"}
+    print("redrawing wordcloud...done")
+    return (wordcloud, frequency_figure, treemap, alert_style)
 
 
 
+@app.callback(
+    [
+        Output("lda-table", "data"),
+        Output("lda-table", "columns"),
+        Output("tsne-lda", "figure"),
+    ],
+    [Input("time-drop", "value")],
+)
+def update_lda_table(selected_year):
+    """ Update LDA table and scatter plot based on precomputed data """
 
-if __name__ == '__main__':
+    if selected_year in PRECOMPUTED_LDA:
+        df_dominant_topic = pd.read_json(
+            PRECOMPUTED_LDA[selected_year]["df_dominant_topic"]
+        )
+        tsne_df = pd.read_json(PRECOMPUTED_LDA[selected_year]["tsne_df"])
+        df_top3words = pd.read_json(PRECOMPUTED_LDA[selected_year]["df_top3words"])
+    else:
+        return [[], [], {}, {}]
+
+    lda_scatter_figure = populate_lda_scatter(tsne_df, df_top3words, df_dominant_topic)
+
+    columns = [{"name": i, "id": i} for i in df_dominant_topic.columns]
+    data = df_dominant_topic.to_dict("records")
+
+    return (data, columns, lda_scatter_figure)
+
+@app.callback(
+    [Output("lda-table", "filter_query"), Output("lda-table-block", "style")],
+    [Input("tsne-lda", "clickData")],
+    [State("lda-table", "filter_query")],
+)
+def filter_table_on_scatter_click(tsne_click, current_filter):
+    """ TODO """
+    if tsne_click is not None:
+        selected_tweet = tsne_click["points"][0]["hovertext"]
+        if current_filter != "":
+            filter_query = (
+                "({Document_No} eq "
+                + str(selected_tweet)
+                + ") || ("
+                + current_filter
+                + ")"
+            )
+        else:
+            filter_query = "{Document_No} eq " + str(selected_tweet)
+        print("current_filter", current_filter)
+        return (filter_query, {"display": "block"})
+    return ["", {"display": "none"}]
+
+if __name__ == "__main__":
     app.run_server(debug=True)
