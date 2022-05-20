@@ -129,17 +129,18 @@ Luego puedes obtener tus credenciales cuatro en total que deberás generar:
 3. access_token_key
 4. access_token_secret_key
 
-Mediante esto podras crear un archivo json con tus credenciales usando el comando <code>python3 create_file_credentials.py</code>
+Mediante esto podras crear un archivo json con tus credenciales usando el comando 
+```python3 create_file_credentials.py```
 
-Luego aplica el archivo <code>get_metadata.py</code> para extraer tweets que sepas que etiqueta tienen por ejemplo fake o real mediante este comando
+Aplica el archivo <code>get_metadata.py</code> para extraer tweets y asignes una etiqueta por ejemplo fake o real mediante este comando
 
 <code>python3 get_metadata.py -i ClaimRealCOVID-19_tweets_ids.csv -o hydrated_tweets -k api_keys.json -c tweet_id -m extended -l real</code>
-con los parametro -i para el archivo de ingreso de ids de tweets
-con el parametro -o para el archivo de salida
-con el parametro k para el archivo de credenciales
-con el parametro -c para la columna que tiene el tweet
-con el parametro -m para el modo extendido que posees para tus credenciales
-con el parametro -l para etiquetar tus datos
+- con los parametro -i para el archivo de ingreso de ids de tweets
+- con el parametro -o para el archivo de salida
+- con el parametro k para el archivo de credenciales
+- con el parametro -c para la columna que tiene el tweet
+- con el parametro -m para el modo extendido que posees para tus credenciales
+- con el parametro -l para etiquetar tus datos
 
 
 Luego puedes realizar una limpieza mediante el archivo clean_tweets.py mediante el comando
@@ -154,22 +155,25 @@ Con eso procesarás solo el archivo con ids de los tweets que has insertado, a m
 
 Primero descomprime los archivos del dataset mencionados anteriormente
 
-crea un entorno virtual mediante
-<code>ptyhon3 -m venv mientorno</code>
+Crea un entorno virtual mediante
 
-activa este entorno para instalar las librerias
+```ptyhon3 -m venv mientorno```
+
+Activa este entorno para instalar las librerias
+
 <code>source mientorno/bin/activate</code>
 
 Esto evitará que genere conflictos con otras librerias que poseas
 
-Enfocado al lanzamiento de la visualizacion se necesita librerias relacionadas a Dash para ello usa el archivo de requirements.txt mediante el comando
+Enfocado al lanzamiento de la visualizacion, se necesita librerias relacionadas a Dash y Plotly, para ello usa el archivo de requirements.txt mediante el comando
+
 <code>pip install -r requirements.txt</code>
 
 Luego ejecuta el app.py ubicado en el directorio source mediante el comando
 
 <code>python3 app.py</code>
 
-Lanzara un host local con la app visitando la url http://127.0.0.1:8050
+Lanzará un host local con la app visitando la url http://127.0.0.1:8050
 
 Con esto tendrás replicado la herramienta de visualización
 
