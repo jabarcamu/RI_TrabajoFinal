@@ -74,7 +74,7 @@ los datos escenciales de un tweet entre ellos son:
 - remover muchos espacios en blanco
 - remover palabras menos de dos caracteres
 
-Todo esto puede ser reconstruido usando archivos proporcionados por Social Media Mining Toolkit [SMMT]https://github.com/thepanacealab/SMMT), el cual se uso para la adquisición y preprocesamiento de los tweets y que adaptados para el caso del dataset CoAID.
+Todo esto puede ser reconstruido usando archivos proporcionados por Social Media Mining Toolkit [SMMT](https://github.com/thepanacealab/SMMT), el cual se uso para la adquisición y preprocesamiento de los tweets y que adaptados para el caso del dataset CoAID.
 
 Los archivos finales deben ser descomprimidos uno es relacionado al propio dataset llamado consolidado.tar.gz y el otro es el precomputado.tar.gz basado en el dataset para el componente de  analisis de topicos.
 
@@ -106,20 +106,20 @@ Existe una visualizacion en base a las frecuencias aplicada a cada tweet del cor
 Existen 3 filtros principales entre ellos:
 
 1. **Filtro de Muestreo:** Es el primero filtro que ayuda a reducir la carga del dataset
-sobre los plots, a una muestra pequenia la visualizacion será rapida a una muestra grande hay mayor precision pero relantiza la visualizacion
+sobre los plots, a una muestra pequenia la visualizacion será rapida a una muestra grande hay mayor precision pero ralentiza la visualizacion
 
 2. **Filtro de Anotacion:** Para esto se escogió un campo del dataset, en este caso
 se uso la fuente de datos, el cual ayuda a aplicar el LDA sobre grupos mas pequenios y evitando tambien grupos con pocos datos. Se debe seleccionar alguno de ellos
 
-3. **Filtro de Tiempo:** esto se aplica al anio 2019 y 2020 por el momento esta el anio 2020
-separado en los diferentes meses con cuartiles el cual obtendra un intervalo de tiempo minimo y maxima fecha para reducir el grupo a una cantidad menor de datos.
+3. **Filtro de Tiempo:** esto se aplica al anio 2019 y 2020 por el momento está el anio 2020
+separado en los diferentes meses con cuartiles el cual obtendrá un intervalo de tiempo mínimo y máxima fecha para reducir el grupo a una cantidad menor de datos.
 
  
 **TODO:** como una actividad posterior es cambiar el filtro de tiempo como principal entrada y el filtro de anotacion como un filtro secundario asi se evita perder data y contar con todos los meses para cuando se realice el segundo filtro.
 
 #### Replicación
 
-#### Replicar una archivo del CoAID 
+#### Replicar un archivo del CoAID 
 
 En caso desees aplicar a otro dataset diferente primero debes conseguir credenciales de twitter en modo extended, el cual requiere llenar y responder ciertos formularios que twitter te pedirá por correo registrado a tu cuenta developer
 
@@ -130,6 +130,7 @@ Luego puedes obtener tus credenciales cuatro en total que deberás generar:
 4. access_token_secret_key
 
 Mediante esto podras crear un archivo json con tus credenciales usando el comando 
+
 ```python3 create_file_credentials.py```
 
 Aplica el archivo <code>get_metadata.py</code> para extraer tweets y asignes una etiqueta por ejemplo fake o real mediante este comando
@@ -144,37 +145,36 @@ Aplica el archivo <code>get_metadata.py</code> para extraer tweets y asignes una
 
 
 Luego puedes realizar una limpieza mediante el archivo clean_tweets.py mediante el comando
+
 <code>python3 clean_tweets.py hydrated_tweets.csv p</code>
 
-Donde debes insertar como parametro el archivo hidratado final de los tweets con el parametro p para preprocesar los datos
-
-Con eso procesarás solo el archivo con ids de los tweets que has insertado, a mayor numero de datos mayor procesamiento, por ello se recomienda realizarlo por partes (grupos de pocos meses)
+Donde debes insertar como parametro el archivo hidratado final de los tweets con el parametro p para preprocesar los datos, con esto procesarás solo el archivo con ids de los tweets que has insertado, a mayor numero de datos mayor procesamiento, por ello se recomienda realizarlo por partes (grupos de pocos meses)
 
 
 #### Lanzar la aplicación de visualización
 
-Primero descomprime los archivos del dataset mencionados anteriormente
+1. Primero descomprime los archivos del dataset mencionados anteriormente
 
-Crea un entorno virtual mediante
+2. Crea un entorno virtual mediante
 
 ```ptyhon3 -m venv mientorno```
 
-Activa este entorno para instalar las librerias
+3. Activa este entorno para instalar las librerias, esto evitará que genere conflictos con otras librerias que poseas
 
 <code>source mientorno/bin/activate</code>
 
-Esto evitará que genere conflictos con otras librerias que poseas
 
-Enfocado al lanzamiento de la visualizacion, se necesita librerias relacionadas a Dash y Plotly, para ello usa el archivo de requirements.txt mediante el comando
+4. Enfocado al lanzamiento de la visualizacion, se necesita librerias relacionadas a Dash y Plotly, para ello usa el archivo de requirements.txt mediante el comando
 
 <code>pip install -r requirements.txt</code>
 
-Luego ejecuta el app.py ubicado en el directorio source mediante el comando
+5. Luego ejecuta el app.py ubicado en el directorio source mediante el comando, se lanzará un host local con la app visitando la url http://127.0.0.1:8050
 
 <code>python3 app.py</code>
 
-Lanzará un host local con la app visitando la url http://127.0.0.1:8050
+Con esto tendrás replicado la herramienta de visualización 🎉🎉🎉
 
-Con esto tendrás replicado la herramienta de visualización
+ 
+     
 
 
