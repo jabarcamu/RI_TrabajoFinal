@@ -1,0 +1,11 @@
+data/dataset_covid19_coaid/precomputed_cp.json
+data/dataset_covid19_coaid/precomputed_group.json
+data/dataset_covid19_coaid/precomputed.json
+data/dataset_covid19_coaid/consolidado.tsv
+data/dataset_covid19_coaid/NewsRealCOVID-19_tweets_ids_hy.tsv
+
+source/__pycache__
+source/precomputing_bp.py
+source/precomputing_exp.py
+
+dataset_banks
