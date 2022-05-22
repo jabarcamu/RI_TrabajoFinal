@@ -3,10 +3,10 @@ import tweepy
 from tweepy import OAuthHandler
 
 # Authenticate
-CONSUMER_KEY = "UH4N5hOhJFbJBdOJwTnTzqFsg" #@param {type:"string"}
-CONSUMER_SECRET_KEY = "1k4OMxuGAMOYWYRfHHTPyQeRb54sPLTn3pC62XrpGZzgOfsBW3" #@param {type:"string"}
-ACCESS_TOKEN_KEY = "1441326109-HCOavAblDFkF2cWmjEREWKu2bLhmK7pxrRW4Ry7" #@param {type:"string"}
-ACCESS_TOKEN_SECRET_KEY = "YEXDEcYt6XieRMVpOeb8Y4g2ClhtAKqnFSRSbqAkj0h9v" #@param {type:"string"}
+CONSUMER_KEY = "" #inserta consumer_key de twitter dev
+CONSUMER_SECRET_KEY = "" #inserta consumer_secret_key de twitter dev
+ACCESS_TOKEN_KEY = "" #inserta access_token_key de twitter dev
+ACCESS_TOKEN_SECRET_KEY = "" #@inserta access_token_secret_key de twitter dev
 
 #Creates a JSON files with api credentials
 with open("api_keys.json", "w") as outfile:
