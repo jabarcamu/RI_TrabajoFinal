@@ -7,18 +7,32 @@ import re
 import json
 from datetime import datetime
 import flask
-import dash
-from dash import dash_table
+
+from dash import Dash
+
+import dash_table
+#from dash import dash_table
+
 import matplotlib.colors as mcolors
+
 import dash_bootstrap_components as dbc
-from dash import dcc
-from dash import html
+
+#from dash import dcc
+import dash_core_components as dcc
+
+#from dash import html
+import dash_html_components as html
+
 import plotly.graph_objs as go
 import plotly.express as px
+
 import pandas as pd
 import numpy as np
 from precomputing_bp import add_stopwords
+
+#from dash import Input, Output, State
 from dash.dependencies import Output, Input, State
+
 from dateutil import relativedelta
 from wordcloud import WordCloud, STOPWORDS
 from sklearn.manifold import TSNE
@@ -34,6 +48,17 @@ GLOBAL_DF = pd.read_csv(DATA_PATH.parent.joinpath(FILENAME),sep="\t")
 with open(DATA_PATH.parent.joinpath(FILENAME_PRECOMPUTED)) as precomputed_file:
     PRECOMPUTED_LDA = json.load(precomputed_file)
 
+
+"""
+We are casting the whole column to datetime to make life easier in the rest of the code.
+It isn't a terribly expensive operation so for the sake of tidyness we went this way.
+"""
+GLOBAL_DF["created_at"] = pd.to_datetime(
+    GLOBAL_DF["created_at"], infer_datetime_format=True
+)
+
+
+
 # sample data: sampling the entire dataset of tweets
 # in order to accelerate the plotting
 # input: dataframe or dataset and float_percent (percentage of sampling)
@@ -45,6 +70,15 @@ def sample_data(dataframe, float_percent):
     print("making a local_df data sample with float_percent: %s" % (float_percent))
     return dataframe.sample(frac=float_percent, random_state=1)
 
+
+def get_tweet_count_by_annot(dataframe):
+    """ Helper function to get tweet counts for unique dates """
+    tweets_counts = dataframe["source"].value_counts()
+    # we filter out all tweets with less than 11 tweet for now
+    tweets_counts = tweets_counts[tweets_counts > 10]
+    values = tweets_counts.keys().tolist()
+    counts = tweets_counts.tolist()
+    return values, counts
 
 
 # helper function in order to work with sample data from covid tweets
@@ -69,14 +103,14 @@ def make_local_df(selected_annot, time_values, n_selection):
         ]
     if selected_annot:
         local_df = local_df[local_df["source"] == selected_annot]
-    print(local_df.head())
+    #print(local_df.head())
     return local_df
 
 
 def make_marks_time_slider(mini, maxi):
     """
     A helper function to generate a dictionary that should look something like:
-    {1420066800: '2020', 1427839200: 'Q2', 1435701600: 'Q3', 1443650400: 'Q4'}
+    {1601528400: '2020', 1609300800: 'Q2', 1617163200: 'Q3', 1625112000: 'Q4'}
     """
     step = relativedelta.relativedelta(months=+1)
     print("Step: ",step)
@@ -241,15 +275,6 @@ def plotly_wordcloud(data_frame):
     return wordcloud_figure_data, frequency_figure_data, treemap_figure
 
 
-
-def get_tweet_count_by_annot(dataframe):
-    """ Helper function to get tweet counts for unique dates """
-    tweets_counts = dataframe["source"].value_counts()
-    # we filter out all tweets with less than 11 tweet for now
-    tweets_counts = tweets_counts[tweets_counts > 10]
-    values = tweets_counts.keys().tolist()
-    counts = tweets_counts.tolist()
-    return values, counts
 
 
 def populate_lda_scatter(tsne_df, df_top3words, df_dominant_topic):
@@ -516,7 +541,7 @@ BODY = dbc.Container(
 )
 
 
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 server = app.server  # for Heroku deployment
 
 app.layout = html.Div(children=[NAVBAR, BODY])
@@ -541,10 +566,10 @@ def populate_bank_dropdown(time_values, n_value):
 # fecha del dataset de tweets.
 @app.callback(
     [
-        Output("time-window-slider", "marks"),
         Output("time-window-slider", "min"),
         Output("time-window-slider", "max"),
         Output("time-window-slider", "step"),
+        Output("time-window-slider", "marks"),
         Output("time-window-slider", "value"),
     ],
     [Input("n-selection-slider", "value")],
@@ -564,6 +589,9 @@ def populate_time_slider(value):
 
     min_date = GLOBAL_DF["created_at"].min()
     max_date = GLOBAL_DF["created_at"].max()
+    
+    print("Global mindate: ",min_date)
+    print("Global maxdate: ",max_date)
 
     marks = make_marks_time_slider(min_date, max_date)
     min_epoch = list(marks.keys())[0]
@@ -572,10 +600,10 @@ def populate_time_slider(value):
     print("marks: ",marks)
     print("marks_epochs: ",min_epoch,max_epoch)
     return (
-        marks,
         min_epoch,
         max_epoch,
         (max_epoch - min_epoch) / (len(list(marks.keys())) * 3),
+        marks,
         [min_epoch, max_epoch],
     )
 
